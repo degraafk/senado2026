@@ -17,7 +17,6 @@ const TABS: { id: 'simulator' | 'risk_ranking'; label: string }[] = [
 
 const SECTIONS = [
   ['hemiciclo', 'Hemiciclo'],
-  ['mayoria', 'Mayoría'],
   ['simulador', 'Ajustar voto'],
   ['provincias', 'Circunscripciones'],
   ['comparativa', 'Comparativa']
