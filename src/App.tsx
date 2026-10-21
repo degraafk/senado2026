@@ -244,7 +244,7 @@ export default function App() {
       <div className="flex-1 max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6 lg:gap-8 items-stretch relative">
           {/* Main Content Column */}
-          <main className="flex-1 min-w-0 space-y-10">
+          <main className="flex-1 min-w-0 space-y-6">
             {activeTab === 'simulator' ? (
           <>
             {/* Hero Section */}
@@ -336,19 +336,13 @@ export default function App() {
           </>
         ) : (
           /* "Mayor Riesgo para la Derecha" Dedicated Ranking Page */
-          <div className="space-y-8 gsap-fade">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-700">
-                <ShieldAlert className="h-4 w-4" />
-                <span>Análisis de Vulnerabilidad Electoral</span>
-                <span>·</span>
-                <span>Bloque Conservador</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight mt-1.5">
-                Mayor Riesgo para la Derecha por Circunscripción
+          <div className="space-y-6 gsap-fade">
+            <div className="max-w-3xl pt-4">
+              <h1 className="text-4xl sm:text-5xl font-semibold text-slate-950 text-balance leading-[1.05]">
+                ¿Dónde puede perder escaños la derecha?
               </h1>
-              <p className="text-slate-600 text-sm sm:text-base max-w-3xl mt-2 leading-relaxed">
-                Ranking de vulnerabilidad para el <strong>Bloque de Derechas (PP + UPN-PP + VOX + Sa Unió)</strong> dividida en dos secciones: plazas donde vence la izquierda y plazas con mayoría de la derecha. Permite simular en tiempo real la <strong>retirada de candidaturas de VOX</strong> circunscripción a circunscripción (100% de votos al PP) para evaluar su efecto inmediato en la recuperación o blindaje del 3-1, 2-1, 2-0 o 1-0.
+              <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
+                Todas las provincias, ordenadas por lo cerca que está el último escaño. Prueba a retirar la lista de VOX en cada una y mira cómo cambia.
               </p>
             </div>
 
@@ -390,23 +384,15 @@ export default function App() {
           aria-live="polite"
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-2xl shadow-slate-900/30 animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          <CheckCircle2 className="h-4 w-4 text-white" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Footer in Light Mode */}
-      <footer className="w-full border-t border-slate-200 bg-white py-8 mt-12">
-        <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-mono">
-          <div>
-            <span>Datos oficiales 2023: Junta Electoral Central (BOE).</span>
-            <span className="mx-2">·</span>
-            <span>Modelo de proyección con multiplicador indexado.</span>
-          </div>
-          <div>
-            <span>Simulador de Escaños del Senado · 209 Senadores</span>
-          </div>
-        </div>
+      <footer className="mt-12 border-t border-slate-200 py-6">
+        <p className="mx-auto max-w-[1720px] px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+          Datos de 2023: Junta Electoral Central (BOE). La proyección multiplica el voto de cada partido por su cambio nacional frente a 2023.
+        </p>
       </footer>
     </div>
   );
