@@ -4,14 +4,13 @@ import { buildData, computeModel, ModelInput, ModelResult } from './engine/senat
 import { PRESETS, PresetScenario, getDefaultBasePercentages, getDefaultDirect } from './data/presets';
 import { TopNav } from './components/TopNav';
 import { Hemicycle } from './components/Hemicycle';
-import { MajorityTracker } from './components/MajorityTracker';
 import { ControlPanel } from './components/ControlPanel';
 import { ConstituencyGrid } from './components/ConstituencyGrid';
 import { ComparisonTable } from './components/ComparisonTable';
 import { PresetBar } from './components/PresetBar';
 import { RightRiskRankingView } from './components/RightRiskRankingView';
 import { ParliamentSidebar } from './components/ParliamentSidebar';
-import { Info, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   // Static base dataset
@@ -31,7 +30,7 @@ export default function App() {
     voxWithdraw: []
   });
 
-  const [targetMajority, setTargetMajority] = useState<number>(133);
+  const targetMajority = 133; // el objetivo es siempre 133
   const [selectedBloc, setSelectedBloc] = useState<Set<string>>(new Set(['PP']));
   const [activePresetId, setActivePresetId] = useState<string | null>('base2023');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -77,7 +76,6 @@ export default function App() {
           Y: json.Y ?? 0,
           voxWithdraw: Array.isArray(json.vw) ? json.vw : []
         });
-        if (typeof json.t === 'number') setTargetMajority(json.t);
         if (Array.isArray(json.b)) setSelectedBloc(new Set(json.b));
         if (json.tab === 'risk_ranking' || json.tab === 'simulator') {
           setActiveTab(json.tab);
@@ -104,7 +102,6 @@ export default function App() {
         Y: base.Y,
         voxWithdraw: base.voxWithdraw ? [...base.voxWithdraw] : []
       });
-      setTargetMajority(base.thr);
       setSelectedBloc(new Set(base.defaultBloc));
       setActivePresetId(base.id);
     }
@@ -162,7 +159,6 @@ export default function App() {
       Y: base.Y,
       voxWithdraw: []
     });
-    setTargetMajority(133);
     setSelectedBloc(new Set(['PP']));
     setActivePresetId(base.id);
     showToast('Restablecido al escenario oficial de 2023');
@@ -177,7 +173,6 @@ export default function App() {
       Y: preset.Y,
       voxWithdraw: preset.voxWithdraw ? [...preset.voxWithdraw] : []
     });
-    setTargetMajority(preset.thr);
     setSelectedBloc(new Set(preset.defaultBloc));
     setActivePresetId(preset.id);
     showToast(`Escenario cargado: ${preset.name}`);
@@ -272,75 +267,46 @@ export default function App() {
               </div>
             </section>
 
-            {/* Section: Hemicycle & Electoral Rules */}
-            <section id="hemiciclo" className="space-y-6 gsap-fade">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-                  {/* Hemicycle Visualization */}
-                  <div className="w-full lg:w-7/12 flex flex-col items-center">
+            {/* Section: Hemicycle + how the vote works */}
+            <section id="hemiciclo" className="gsap-fade">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+                <div className="grid gap-8 lg:grid-cols-12">
+                  <div className="lg:col-span-8">
                     <Hemicycle
                       result={result}
                       selectedBloc={selectedBloc}
                       onTogglePartyInBloc={handleTogglePartyInBloc}
+                      onClearBloc={() => handleSetBloc([])}
                       targetMajority={targetMajority}
                     />
                   </div>
 
-                  {/* Electoral Rules & Guide Card in Light Mode */}
-                  <div className="w-full lg:w-5/12 flex flex-col gap-4 text-xs text-slate-700 bg-slate-50 p-5 rounded-xl border border-slate-200">
-                    <div className="flex items-center gap-2 text-slate-900 font-bold pb-2 border-b border-slate-200">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm">Cómo se reparten los escaños</span>
+                  <div className="flex flex-col gap-5 lg:col-span-4 lg:border-l lg:border-slate-200 lg:pl-8">
+                    <h3 className="text-xl font-semibold text-slate-950">Cómo funciona el voto</h3>
+                    <div className="space-y-4 text-sm leading-relaxed text-slate-600">
+                      <p>
+                        <strong className="text-slate-900">Cada votante marca 3 nombres, no 4.</strong> En casi todas las provincias se eligen 4 senadores, así que lo normal es que el primer partido se lleve 3 y el segundo 1.
+                      </p>
+                      <p>
+                        <strong className="text-slate-900">VOX puede retirar su lista.</strong> Si lo hace en una provincia, el modelo pasa todos sus votos al PP para asegurar ese 3-1.
+                      </p>
+                      <p>
+                        <strong className="text-slate-900">Ibiza y Formentera votan por separado.</strong> Son dos circunscripciones de un senador cada una, y por eso son 209 senadores electos.
+                      </p>
                     </div>
-
-                    <div className="space-y-3 font-normal leading-relaxed text-slate-600">
-                      <div className="flex items-start gap-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 font-mono">
-                          1
-                        </span>
-                        <span>
-                          <strong>Voto limitado (3 marcas de 4):</strong> En la península se eligen 4 senadores por provincia. Casi siempre el primer partido se lleva 3 senadores y el segundo 1 senador.
-                        </span>
+                    <dl className="mt-auto flex gap-8 border-t border-slate-100 pt-4 text-sm">
+                      <div>
+                        <dt className="text-slate-500">Mayoría absoluta</dt>
+                        <dd className="font-display text-3xl font-semibold text-slate-900 tabular-nums">105</dd>
                       </div>
-
-                      <div className="flex items-start gap-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 font-mono">
-                          2
-                        </span>
-                        <span>
-                          <strong>Retirada de VOX y voto útil:</strong> El pacto de retirada de listas de VOX transfiere el 100% de los votos al PP en cada circunscripción elegida para asegurar el 3-1.
-                        </span>
+                      <div>
+                        <dt className="text-slate-500">Objetivo</dt>
+                        <dd className="font-display text-3xl font-semibold text-brass tabular-nums">{targetMajority}</dd>
                       </div>
-
-                      <div className="flex items-start gap-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 font-mono">
-                          3
-                        </span>
-                        <span>
-                          <strong>Separación Ibiza / Formentera:</strong> En 2026 pasan a ser dos circunscripciones uninominales separadas, sumando un total de 209 senadores electos.
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] font-mono text-slate-500">
-                      <span>Mayoría absoluta: 105</span>
-                      <span className="font-bold text-brass">Objetivo 133</span>
-                    </div>
+                    </dl>
                   </div>
                 </div>
               </div>
-            </section>
-
-            {/* Section: Majority Tracker (133 seats check) */}
-            <section id="mayoria" className="gsap-fade">
-              <MajorityTracker
-                result={result}
-                selectedBloc={selectedBloc}
-                onTogglePartyInBloc={handleTogglePartyInBloc}
-                onSetBloc={handleSetBloc}
-                targetMajority={targetMajority}
-                onTargetMajorityChange={val => setTargetMajority(val)}
-              />
             </section>
 
             {/* Section: Control Panel (Sliders, Percentages, Strategic Transfer & VOX Withdrawal) */}
