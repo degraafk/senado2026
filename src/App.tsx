@@ -253,21 +253,14 @@ export default function App() {
             {activeTab === 'simulator' ? (
           <>
             {/* Hero Section */}
-            <section className="space-y-4 gsap-fade">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-blue-700">
-                    <span>Elecciones Generales · Senado de España</span>
-                    <span>·</span>
-                    <span>209 Senadores Directos</span>
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight mt-1.5 text-balance">
-                    Simulador del Senado 2026
-                  </h1>
-                  <p className="text-slate-600 text-sm sm:text-base max-w-3xl mt-2 leading-relaxed">
-                    El Senado se elige mediante un sistema mayoritario de listas abiertas con voto limitado (hasta 3 marcas en circunscripciones de 4 escaños). Modifica el porcentaje nacional de cada formación, simula la retirada de candidaturas de VOX por circunscripción y comprueba si se alcanza la <strong>mayoría de 133 senadores</strong> para el control absoluto de la cámara.
-                  </p>
-                </div>
+            <section className="space-y-6 gsap-fade">
+              <div className="max-w-4xl pt-4">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold text-slate-950 text-balance leading-[1.02]">
+                  ¿Quién controlará el Senado en 2026?
+                </h1>
+                <p className="text-slate-600 text-base sm:text-lg max-w-2xl mt-4 leading-relaxed">
+                  Cada provincia elige 4 senadores, pero cada votante solo puede marcar 3. Mueve el voto de cada partido y mira si alguien llega a los <strong className="text-slate-900">133 escaños</strong> que dan mayoría de tres quintos.
+                </p>
               </div>
 
               {/* Preset scenarios bar */}
@@ -297,7 +290,7 @@ export default function App() {
                   <div className="w-full lg:w-5/12 flex flex-col gap-4 text-xs text-slate-700 bg-slate-50 p-5 rounded-xl border border-slate-200">
                     <div className="flex items-center gap-2 text-slate-900 font-bold pb-2 border-b border-slate-200">
                       <Info className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm">Reglas del Sistema del Senado</span>
+                      <span className="text-sm">Cómo se reparten los escaños</span>
                     </div>
 
                     <div className="space-y-3 font-normal leading-relaxed text-slate-600">
@@ -330,8 +323,8 @@ export default function App() {
                     </div>
 
                     <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] font-mono text-slate-500">
-                      <span>Umbral absoluta: 105</span>
-                      <span className="font-bold text-blue-700">Objetivo 133</span>
+                      <span>Mayoría absoluta: 105</span>
+                      <span className="font-bold text-brass">Objetivo 133</span>
                     </div>
                   </div>
                 </div>
