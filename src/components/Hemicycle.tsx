@@ -236,7 +236,7 @@ export const Hemicycle: React.FC<HemicycleProps> = ({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke={isTarget ? '#2563eb' : '#64748b'}
+                    stroke={isTarget ? '#a9741a' : '#64748b'}
                     strokeWidth={isTarget ? 2.5 : 1.5}
                     strokeDasharray={isTarget ? undefined : '2,2'}
                   />
@@ -244,7 +244,7 @@ export const Hemicycle: React.FC<HemicycleProps> = ({
                     x={tx}
                     y={ty + 4}
                     textAnchor="middle"
-                    fill={isTarget ? '#1d4ed8' : '#475569'}
+                    fill={isTarget ? '#a9741a' : '#475569'}
                     className="font-mono text-[12px] font-bold"
                   >
                     {t.val}
@@ -319,7 +319,7 @@ export const Hemicycle: React.FC<HemicycleProps> = ({
                   fill="#64748b"
                   className="text-xs"
                 >
-                  Toca un partido para sumarlo al bloque de mayoría
+                  Toca un partido para sumarlo a tu mayoría
                 </text>
               </>
             )}
@@ -331,7 +331,7 @@ export const Hemicycle: React.FC<HemicycleProps> = ({
           <span>Anillo exterior: 2026</span>
           <div className="flex items-center gap-3">
             {ticksList.map(t => (
-              <span key={t.val} className={t.val === targetMajority ? 'text-blue-600 font-bold' : ''}>
+              <span key={t.val} className={t.val === targetMajority ? 'text-brass font-bold' : ''}>
                 {t.val} {t.label.toLowerCase()}
               </span>
             ))}
