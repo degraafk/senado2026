@@ -1,220 +1,103 @@
-import React from 'react';
-import { X, Award, Zap, Check, RotateCcw } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { X, Check } from 'lucide-react';
 import { ConstituencyResult } from '../engine/senateEngine';
 import { PARTY_COLORS, formatConstituencyName, getPartyTint, getConstituencyCCAA } from '../data/electionData';
+import { Delta, fmt } from './ui';
 
-interface ConstituencyDetailModalProps {
+interface Props {
   constituency: ConstituencyResult | null;
   onClose: () => void;
   onToggleVoxWithdraw?: (name: string) => void;
 }
 
-export const ConstituencyDetailModal: React.FC<ConstituencyDetailModalProps> = ({
-  constituency,
-  onClose,
-  onToggleVoxWithdraw
-}) => {
-  if (!constituency) return null;
+export const ConstituencyDetailModal: React.FC<Props> = ({ constituency, onClose, onToggleVoxWithdraw }) => {
+  useEffect(() => {
+    if (!constituency) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [constituency, onClose]);
 
-  const totalSeats = constituency.n;
-  const hasVoxCandidates = constituency.list.some(c => c.g === 'VOX');
-  const ccaa = getConstituencyCCAA(constituency.name);
+  if (!constituency) return null;
+  const n = constituency.n;
+  const hasVox = constituency.list.some(c => c.g === 'VOX');
+  const dest = constituency.name.includes('FORMENTERA') ? 'Sa Unió' : 'PP';
+  const name = formatConstituencyName(constituency.name);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50/80">
+      <div role="dialog" aria-modal="true" aria-label={name} className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                {formatConstituencyName(constituency.name)}
-              </h3>
-              <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-md">
-                {ccaa}
-              </span>
-              <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-200/80 px-2.5 py-0.5 rounded-md">
-                {totalSeats} {totalSeats > 1 ? 'escaños en juego' : 'escaño en juego'}
-              </span>
-              {constituency.voxWithdrawn && (
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md">
-                  VOX retirado
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Ganan el escaño los {totalSeats} candidatos con mayor número de votos. Sistema de listas abiertas y voto limitado.
+            <h3 className="text-2xl font-semibold text-slate-950">{name}</h3>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {getConstituencyCCAA(constituency.name)} · {n} {n > 1 ? 'senadores' : 'senador'}
+              {constituency.voxWithdrawn && <span className="ml-2 font-semibold text-slate-900">VOX retirado</span>}
             </p>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-            aria-label="Cerrar ventana"
-          >
+          <button onClick={onClose} aria-label="Cerrar" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-900 cursor-pointer">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* VOX Withdrawal Strategy Card */}
-        {hasVoxCandidates && onToggleVoxWithdraw && (
-          <div
-            className={`px-5 py-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
-              constituency.voxWithdrawn
-                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                : 'bg-blue-50/60 border-blue-200 text-blue-950'
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`p-1.5 rounded-lg ${
-                  constituency.voxWithdrawn
-                    ? 'bg-emerald-200 text-emerald-900'
-                    : 'bg-blue-200 text-blue-900'
+        {(hasVox && onToggleVoxWithdraw) || constituency.margin !== null ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-sm">
+            {constituency.margin !== null && (
+              <span className="text-slate-600">
+                Margen de corte: <strong className={`tabular-nums ${constituency.margin < 3000 ? 'text-brass' : 'text-slate-900'}`}>{fmt(constituency.margin)} votos</strong>
+              </span>
+            )}
+            {hasVox && onToggleVoxWithdraw && (
+              <button
+                onClick={() => onToggleVoxWithdraw(constituency.name)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold cursor-pointer transition-colors ${
+                  constituency.voxWithdrawn ? 'border-slate-300 bg-white text-slate-700 hover:border-slate-900' : 'border-slate-900 bg-slate-900 text-white hover:bg-slate-700'
                 }`}
               >
-                {constituency.voxWithdrawn ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Zap className="h-4 w-4" />
-                )}
-              </span>
-              <div>
-                <span className="font-bold block">
-                  {constituency.voxWithdrawn
-                    ? 'VOX ha retirado sus candidaturas en esta circunscripción'
-                    : 'Pacto de concentración: Retirar candidatura de VOX'}
-                </span>
-                <span className="text-[11px] opacity-85 block mt-0.5">
-                  {constituency.voxWithdrawn
-                    ? `El 100% de los votos de VOX se han sumado ${constituency.name.includes('FORMENTERA') ? 'a Sa Unió' : 'al PP'}, fortaleciendo la candidatura de derechas.`
-                    : `Al retirar la lista de VOX, todos sus votos se transferirán automáticamente ${constituency.name.includes('FORMENTERA') ? 'a Sa Unió' : 'al PP'}.`}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => onToggleVoxWithdraw(constituency.name)}
-              className={`px-3 py-1.5 rounded-lg font-bold text-xs shrink-0 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5 self-start sm:self-auto ${
-                constituency.voxWithdrawn
-                  ? 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {constituency.voxWithdrawn ? (
-                <>
-                  <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Restablecer lista VOX</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="h-3.5 w-3.5 text-amber-300" />
-                  <span>Retirar VOX (100% al PP)</span>
-                </>
-              )}
-            </button>
+                {constituency.voxWithdrawn ? 'Volver a presentar a VOX' : `Retirar VOX (todo al ${dest})`}
+              </button>
+            )}
           </div>
-        )}
+        ) : null}
 
-        {/* Margin Notice Banner */}
-        {constituency.margin !== null && (
-          <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-            <span className="text-slate-600">
-              Margen de corte entre el último electo ({constituency.last?.g}) y el primer candidato sin escaño ({constituency.next?.g}):
-            </span>
-            <span
-              className={`font-mono font-bold tabular-nums ${
-                constituency.margin < 3000 ? 'text-amber-700 font-extrabold' : 'text-slate-800'
-              }`}
-            >
-              {constituency.margin.toLocaleString('es-ES')} votos
-            </span>
-          </div>
-        )}
-
-        {/* Candidate List Table */}
-        <div className="p-5 overflow-y-auto flex-1">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="flex-1 overflow-y-auto px-5 py-2">
+          <table className="w-full border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 font-mono">
-                <th className="py-2.5 px-3 text-center w-12">Puesto</th>
-                <th className="py-2.5 px-3">Candidatura / Partido</th>
-                <th className="py-2.5 px-3 text-right">Votos 2023</th>
-                <th className="py-2.5 px-3 text-right">Votos 2026 Proy.</th>
-                <th className="py-2.5 px-3 text-center w-24">Resultado</th>
+              <tr className="text-xs text-slate-500">
+                <th className="w-8 py-2 font-medium">#</th>
+                <th className="py-2 font-medium">Candidatura</th>
+                <th className="py-2 text-right font-medium">2023</th>
+                <th className="py-2 text-right font-medium">2026</th>
+                <th className="w-8 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono">
-              {constituency.list.map(cand => {
-                const isElected = cand.rank <= totalSeats && cand.f > 0;
-                const isCutoff = cand.rank === totalSeats;
-                const partyColor = PARTY_COLORS[cand.g] || '#64748b';
-
+            <tbody>
+              {constituency.list.map(c => {
+                const elected = c.rank <= n && c.f > 0;
                 return (
                   <tr
-                    key={cand.i}
-                    style={{
-                      backgroundColor: isElected ? getPartyTint(cand.g, 0.06) : undefined
-                    }}
-                    className={`transition-colors ${
-                      isElected ? 'font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'
-                    } ${isCutoff ? 'border-b-2 border-slate-400' : ''}`}
+                    key={c.i}
+                    style={elected ? { backgroundColor: getPartyTint(c.g, 0.07) } : undefined}
+                    className={`border-b border-slate-100 ${c.rank === n ? 'border-b-2 border-slate-900' : ''} ${elected ? 'text-slate-950' : 'text-slate-500'}`}
                   >
-                    <td className="py-2.5 px-3 text-center">
-                      <span
-                        className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold ${
-                          isElected
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {cand.rank}
+                    <td className="py-1.5 tabular-nums">{c.rank}</td>
+                    <td className="py-1.5">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: PARTY_COLORS[c.g] || '#8f968c' }} />
+                        <span className="min-w-0">
+                          <span className="block font-semibold">{c.g}</span>
+                          <span className="block max-w-[15rem] truncate text-xs text-slate-500">
+                            {c.l}{c.note && ` · ${c.note}`}
+                          </span>
+                        </span>
                       </span>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                          style={{ backgroundColor: partyColor }}
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-sans font-bold text-slate-900">
-                            {cand.g}
-                          </span>
-                          <span className="text-[10px] text-slate-500 truncate max-w-[240px]">
-                            {cand.l}
-                          </span>
-                          {cand.note && (
-                            <span className="text-[9px] text-amber-700 font-mono font-semibold">
-                              ({cand.note})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-slate-500 tabular-nums">
-                      {cand.v.toLocaleString('es-ES')}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-slate-900 tabular-nums">
-                      {cand.f.toLocaleString('es-ES')}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {isElected ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                          <Award className="h-3 w-3 text-emerald-600" />
-                          Electo
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">
-                          Sin escaño
-                        </span>
-                      )}
-                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-slate-500">{fmt(c.v)}</td>
+                    <td className={`py-1.5 text-right tabular-nums ${elected ? 'font-bold' : ''}`}>{fmt(c.f)}</td>
+                    <td className="py-1.5 text-right">{elected && <Check className="ml-auto h-4 w-4 text-slate-900" strokeWidth={3} aria-label="Electo" />}</td>
                   </tr>
                 );
               })}
@@ -222,22 +105,19 @@ export const ConstituencyDetailModal: React.FC<ConstituencyDetailModalProps> = (
           </table>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50/80 flex items-center justify-between">
-          <span className="text-xs text-slate-600">
-            {constituency.diff.length > 0
-              ? `Variación vs 2023: ${constituency.diff
-                  .map(([g, d]) => `${d > 0 ? '+' : ''}${d} ${g}`)
-                  .join(' · ')}`
-              : 'Misma asignación de senadores que en 2023'}
-          </span>
-
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors cursor-pointer"
-          >
-            Cerrar
-          </button>
+        <div className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
+          {constituency.diff.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-x-3">
+              Frente a 2023:
+              {constituency.diff.map(([g, d]) => (
+                <span key={g} className="flex items-center gap-1 font-semibold" style={{ color: PARTY_COLORS[g] }}>
+                  <Delta d={d} /> {g}
+                </span>
+              ))}
+            </span>
+          ) : (
+            'Mismo reparto que en 2023.'
+          )}
         </div>
       </div>
     </div>

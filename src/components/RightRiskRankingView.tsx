@@ -1,736 +1,208 @@
 import React, { useState, useMemo } from 'react';
-import {
-  AlertTriangle,
-  ShieldAlert,
-  ShieldCheck,
-  Search,
-  ChevronRight,
-  Info,
-  TrendingUp,
-  ArrowUpRight,
-  Flame,
-  CheckCircle2,
-  Check,
-  RotateCcw,
-  Zap,
-  UserX,
-  UserCheck
-} from 'lucide-react';
+import { Check } from 'lucide-react';
 import { ModelResult, ConstituencyResult } from '../engine/senateEngine';
-import {
-  computeRightWingRiskAnalysis,
-  ConstituencyRiskProfile
-} from '../engine/riskAnalysis';
-import {
-  PARTY_COLORS,
-  formatConstituencyName,
-  ORDER,
-  getConstituencyCCAA
-} from '../data/electionData';
+import { computeRightWingRiskAnalysis, ConstituencyRiskProfile } from '../engine/riskAnalysis';
+import { PARTY_COLORS, formatConstituencyName, getConstituencyCCAA, getPartyTint } from '../data/electionData';
 import { ConstituencyDetailModal } from './ConstituencyDetailModal';
+import { CARD, Pill, SearchBox, SeatDots, dec, fmt } from './ui';
 
-interface RightRiskRankingViewProps {
+interface Props {
   result: ModelResult;
   voxWithdraw: string[];
   onToggleVoxWithdraw: (constituencyName: string) => void;
   onSetVoxWithdraw: (constituencies: string[]) => void;
 }
 
-type SectionViewMode = 'all' | 'left_wins' | 'right_majority';
+type Mode = 'all' | 'left' | 'right';
 
-export const RightRiskRankingView: React.FC<RightRiskRankingViewProps> = ({
-  result,
-  voxWithdraw,
-  onToggleVoxWithdraw,
-  onSetVoxWithdraw
-}) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<SectionViewMode>('all');
-  const [selectedConstituency, setSelectedConstituency] = useState<ConstituencyResult | null>(null);
+interface TableProps {
+  title: string;
+  sub: string;
+  items: ConstituencyRiskProfile[];
+  kind: 'left' | 'right';
+  action: React.ReactNode;
+  onOpen: (name: string) => void;
+  onToggle: (name: string) => void;
+}
 
-  // Compute dual ranking from engine
-  const dualRanking = useMemo(() => {
-    return computeRightWingRiskAnalysis(result);
-  }, [result]);
+const RiskTable: React.FC<TableProps> = ({ title, sub, items, kind, action, onOpen, onToggle }) => (
+  <section className={CARD}>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 className="text-2xl font-semibold text-slate-950">
+          {title} <span className="ml-1 text-base font-normal text-slate-400 tabular-nums">{items.length}</span>
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-slate-500">{sub}</p>
+      </div>
+      {action}
+    </div>
 
-  const {
-    leftWinningList,
-    rightWinningList,
-    leftWinningCount,
-    rightWinningCount,
-    criticalCount,
-    moderateCount,
-    safeCount,
-    rightSeats
-  } = dualRanking;
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-xs text-slate-500">
+            <th className="w-8 py-2 font-medium">#</th>
+            <th className="py-2 font-medium">Circunscripción</th>
+            <th className="py-2 text-center font-medium">Derecha</th>
+            <th className="py-2 font-medium">{kind === 'left' ? 'Posibilidad de remontar' : 'Riesgo'}</th>
+            <th className="py-2 text-right font-medium">{kind === 'left' ? 'Déficit' : 'Colchón'}</th>
+            <th className="py-2 text-right font-medium">VOX</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it, idx) => {
+            const hot = kind === 'left' ? it.feasibilityLabel?.startsWith('Muy') : it.riskCategory === 'critical';
+            const votes = kind === 'left' ? it.marginToGainVotes : it.marginToLoseVotes;
+            const pct = kind === 'left' ? it.marginToGainPct : it.marginToLosePct;
+            const a = kind === 'left' ? it.firstRightChallenger : it.lastRightElected;
+            const b = kind === 'left' ? it.lastNonRightElected : it.firstNonRightChallenger;
+            const label = kind === 'left' ? it.feasibilityLabel : it.riskCategoryLabel;
+            const dest = it.name.includes('FORMENTERA') ? 'Sa Unió' : 'PP';
+            return (
+              <tr
+                key={it.name}
+                onClick={() => onOpen(it.name)}
+                style={hot ? { boxShadow: 'inset 3px 0 0 #a9741a' } : undefined}
+                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50"
+              >
+                <td className="py-2.5 pl-2 text-xs tabular-nums text-slate-400">{idx + 1}</td>
+                <td className="py-2.5 pr-3">
+                  <button className="block text-left font-semibold text-slate-950">
+                    {formatConstituencyName(it.name)}
+                    <span className="ml-2 text-xs font-normal text-slate-400">{getConstituencyCCAA(it.name)}</span>
+                  </button>
+                  <span className="mt-1 block"><SeatDots tally={it.seatsDistribution} size={10} /></span>
+                </td>
+                <td className="py-2.5 text-center tabular-nums text-slate-700">{it.currentRightSeats}<span className="text-slate-400"> / {it.maxRightSeats}</span></td>
+                <td className="py-2.5 pr-3">
+                  <span className={`block font-semibold ${hot ? 'text-brass' : 'text-slate-800'}`}>{label}</span>
+                  <span className="block text-xs text-slate-500">
+                    {it.scenarioTransition}
+                    {a && b && <> · {a.g} {fmt(a.f)} vs {b.g} {fmt(b.f)}</>}
+                  </span>
+                </td>
+                <td className="py-2.5 text-right tabular-nums">
+                  <span className="block font-semibold text-slate-900">{votes != null ? `${kind === 'left' ? '−' : '+'}${fmt(votes)}` : '–'}</span>
+                  <span className="block text-xs text-slate-500">{pct != null ? `${dec(pct)} %` : ''}</span>
+                </td>
+                <td className="py-2.5 pr-2 text-right">
+                  {!it.hasVoxCandidates ? (
+                    <span className="text-xs text-slate-400">sin lista</span>
+                  ) : it.voxWithdrawn ? (
+                    <button
+                      onClick={e => { e.stopPropagation(); onToggle(it.name); }}
+                      style={{ borderColor: PARTY_COLORS['VOX'], backgroundColor: getPartyTint('VOX', 0.14) }}
+                      className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold text-slate-950 cursor-pointer"
+                      title={`Volver a presentar a VOX (ahora todo va al ${dest})`}
+                    >
+                      <Check className="h-3 w-3" strokeWidth={3} /> Retirado
+                    </button>
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); onToggle(it.name); }}
+                      className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:border-slate-900 cursor-pointer"
+                      title={`Pasaría unos ${fmt(it.estimatedVoxVotes)} votos al ${dest}`}
+                    >
+                      Retirar · {Math.round(it.estimatedVoxVotes / 1000)}k
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {items.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No hay circunscripciones con estos filtros.</p>}
+    </div>
+  </section>
+);
 
-  const totalWithdrawnCount = voxWithdraw.length;
+export const RightRiskRankingView: React.FC<Props> = ({ result, voxWithdraw, onToggleVoxWithdraw, onSetVoxWithdraw }) => {
+  const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<Mode>('all');
+  const [selected, setSelected] = useState<ConstituencyResult | null>(null);
 
-  // Filter lists by search query (province or CCAA, preserving risk ranking order)
-  const filteredLeftList = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return leftWinningList;
-    return leftWinningList.filter(
-      item =>
-        formatConstituencyName(item.name).toLowerCase().includes(q) ||
-        getConstituencyCCAA(item.name).toLowerCase().includes(q)
-    );
-  }, [leftWinningList, searchQuery]);
+  const r = useMemo(() => computeRightWingRiskAnalysis(result), [result]);
 
-  const filteredRightList = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return rightWinningList;
-    return rightWinningList.filter(
-      item =>
-        formatConstituencyName(item.name).toLowerCase().includes(q) ||
-        getConstituencyCCAA(item.name).toLowerCase().includes(q)
-    );
-  }, [rightWinningList, searchQuery]);
-
-  // Batch actions
-  const handleWithdrawAllLeftWinning = () => {
-    const namesToWithdraw = new Set(voxWithdraw);
-    leftWinningList.forEach(item => {
-      if (item.hasVoxCandidates) {
-        namesToWithdraw.add(item.name);
-      }
-    });
-    onSetVoxWithdraw(Array.from(namesToWithdraw));
+  const filter = (list: ConstituencyRiskProfile[]) => {
+    const q = query.toLowerCase().trim();
+    return q ? list.filter(i => formatConstituencyName(i.name).toLowerCase().includes(q) || getConstituencyCCAA(i.name).toLowerCase().includes(q)) : list;
   };
+  const left = useMemo(() => filter(r.leftWinningList), [r, query]);
+  const right = useMemo(() => filter(r.rightWinningList), [r, query]);
 
-  const handleWithdrawAllCritical = () => {
-    const namesToWithdraw = new Set(voxWithdraw);
-    rightWinningList
-      .filter(item => item.riskCategory === 'critical' && item.hasVoxCandidates)
-      .forEach(item => namesToWithdraw.add(item.name));
-    onSetVoxWithdraw(Array.from(namesToWithdraw));
-  };
+  const addWithdrawn = (names: string[]) => onSetVoxWithdraw(Array.from(new Set([...voxWithdraw, ...names])));
+  const open = (name: string) => { const c = result.cons.find(x => x.name === name); if (c) setSelected(c); };
 
-  const handleResetAllWithdrawals = () => {
-    onSetVoxWithdraw([]);
-  };
-
-  const handleOpenConstituency = (name: string) => {
-    const found = result.cons.find(c => c.name === name);
-    if (found) setSelectedConstituency(found);
-  };
+  const stats = [
+    { v: `${r.rightSeats}`, of: `/ ${result.totalSeats}`, l: 'escaños de la derecha' },
+    { v: r.leftWinningCount, of: '', l: 'provincias donde gana la izquierda' },
+    { v: r.criticalCount, of: '', l: 'con la derecha en riesgo crítico', hot: true },
+    { v: voxWithdraw.length, of: '', l: 'listas de VOX retiradas' }
+  ];
 
   return (
-    <div className="w-full space-y-6">
-      {/* Executive Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
-          <span className="text-xs font-mono font-semibold text-slate-500 uppercase tracking-wider">
-            Escaños Totales Derecha
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-extrabold text-blue-700 font-mono tabular-nums">
-              {rightSeats}
-            </span>
-            <span className="text-xs font-mono text-slate-500">
-              / {result.totalSeats}
-            </span>
+    <div className="w-full space-y-5">
+      <div className={`${CARD} grid grid-cols-2 gap-y-4 md:grid-cols-4 md:divide-x md:divide-slate-100`}>
+        {stats.map((s, i) => (
+          <div key={i} className="md:px-5 first:md:pl-0">
+            <div className={`font-display text-4xl font-semibold tabular-nums ${s.hot ? 'text-brass' : 'text-slate-950'}`}>
+              {s.v}<span className="ml-1 font-sans text-sm font-normal text-slate-400">{s.of}</span>
+            </div>
+            <div className="text-sm text-slate-500">{s.l}</div>
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">
-            PP + UPN-PP + VOX + Sa Unió
-          </span>
-        </div>
-
-        <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/50 shadow-2xs">
-          <span className="text-xs font-mono font-semibold text-rose-800 uppercase tracking-wider">
-            Donde Vence la Izquierda
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-extrabold text-rose-700 font-mono tabular-nums">
-              {leftWinningCount}
-            </span>
-            <span className="text-xs font-mono text-rose-600">
-              plazas
-            </span>
-          </div>
-          <span className="text-[11px] text-rose-700 font-medium mt-1 block">
-            De más posibles a imposibles
-          </span>
-        </div>
-
-        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 shadow-2xs">
-          <span className="text-xs font-mono font-semibold text-amber-800 uppercase tracking-wider">
-            Mayoría Derecha: Críticas (&lt; 2 %)
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-extrabold text-amber-700 font-mono tabular-nums">
-              {criticalCount}
-            </span>
-            <span className="text-xs font-mono text-amber-700">
-              plazas
-            </span>
-          </div>
-          <span className="text-[11px] text-amber-700 font-medium mt-1 block">
-            A riesgo inminente de caer a 2-2
-          </span>
-        </div>
-
-        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 shadow-2xs">
-          <span className="text-xs font-mono font-semibold text-emerald-800 uppercase tracking-wider">
-            Candidaturas VOX Retiradas
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-extrabold text-emerald-700 font-mono tabular-nums">
-              {totalWithdrawnCount}
-            </span>
-            <span className="text-xs font-mono text-emerald-700">
-              / {result.totalSeats > 0 ? 59 : 0}
-            </span>
-          </div>
-          <span className="text-[11px] text-emerald-700 font-medium mt-1 block">
-            100% votos transferidos al PP
-          </span>
-        </div>
+        ))}
       </div>
 
-      {/* Explanatory Banner with Strategy & VOX Withdrawal controls */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-blue-50 text-blue-700 shrink-0 mt-0.5">
-            <Info className="h-5 w-5" />
-          </div>
-          <div className="space-y-2 text-xs text-slate-600 leading-relaxed flex-1">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-900">
-                Dos Categorías Electorales y Opción de Retirada de VOX por Circunscripción
-              </h3>
-              {totalWithdrawnCount > 0 && (
-                <button
-                  onClick={handleResetAllWithdrawals}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors cursor-pointer flex items-center gap-1 self-start sm:self-auto"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Restablecer todas las listas de VOX ({totalWithdrawnCount})
-                </button>
-              )}
-            </div>
-            <p>
-              El informe divide el mapa electoral en dos bloques y permite simular el pacto de retirada de listas de VOX circunscripción a circunscripción (100% de sus votos pasan a los candidatos del PP):
-            </p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>
-                <strong>1. Plazas donde vence la izquierda / nacionalistas:</strong> La derecha está en minoría. Se ordenan desde las <strong>más factibles de recuperar</strong> (menor déficit de votos y %) hasta las <strong>imposibles</strong>. Retirar a VOX en estas plazas puede voltear el 1-3 a 3-1 o empatar a 2-2.
-              </li>
-              <li>
-                <strong>2. Plazas donde la mayoría la tiene la derecha:</strong> La derecha ostenta la mayoría (3-1, 2-1, 2-0 o 1-0). Se ordenan desde las <strong>más críticas</strong> (menor colchón frente al corte para caer a 2-2) hasta los <strong>bastiones seguros</strong>.
-              </li>
-            </ul>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBox value={query} onChange={setQuery} placeholder="Buscar provincia" />
+        <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
+        <Pill active={mode === 'all'} onClick={() => setMode('all')}>Todas ({r.totalCirc})</Pill>
+        <Pill active={mode === 'left'} onClick={() => setMode('left')}>Gana la izquierda ({r.leftWinningCount})</Pill>
+        <Pill active={mode === 'right'} onClick={() => setMode('right')}>Mayoría de la derecha ({r.rightWinningCount})</Pill>
+        {voxWithdraw.length > 0 && (
+          <button onClick={() => onSetVoxWithdraw([])} className="ml-auto px-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-900 cursor-pointer">
+            Volver a presentar a VOX en todas ({voxWithdraw.length})
+          </button>
+        )}
       </div>
 
-      {/* Search, Section View Controls, and Global Batch Buttons */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-        {/* Search */}
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Filtrar por provincia o isla..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Section View Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => setViewMode('all')}
-            className={`px-3 py-1.5 text-xs rounded-lg transition-colors cursor-pointer font-semibold ${
-              viewMode === 'all'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Ver Ambas Secciones ({dualRanking.totalCirc})
-          </button>
-          <button
-            onClick={() => setViewMode('left_wins')}
-            className={`px-3 py-1.5 text-xs rounded-lg transition-colors cursor-pointer font-semibold flex items-center gap-1.5 ${
-              viewMode === 'left_wins'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
-            }`}
-          >
-            <ShieldAlert className="h-3.5 w-3.5" />
-            <span>1. Vence la Izquierda ({leftWinningCount})</span>
-          </button>
-          <button
-            onClick={() => setViewMode('right_majority')}
-            className={`px-3 py-1.5 text-xs rounded-lg transition-colors cursor-pointer font-semibold flex items-center gap-1.5 ${
-              viewMode === 'right_majority'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>2. Mayoría Derecha ({rightWinningCount})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* SECTION 1: WHERE LEFT WINS (SORTED FROM MOST POSSIBLE TO IMPOSSIBLE TO RECOVER) */}
-      {(viewMode === 'all' || viewMode === 'left_wins') && (
-        <div className="rounded-2xl border-2 border-rose-200 bg-white overflow-hidden shadow-sm">
-          {/* Section Header */}
-          <div className="p-5 border-b border-rose-100 bg-rose-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-600 text-white font-bold text-xs">
-                1
-              </span>
-              <div>
-                <h3 className="text-base font-extrabold text-rose-950 tracking-tight flex items-center gap-2">
-                  <span>Plazas donde Vence la Izquierda / Nacionalistas</span>
-                  <span className="text-xs font-mono font-bold bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-full">
-                    {filteredLeftList.length} circunscripciones
-                  </span>
-                </h3>
-                <p className="text-xs text-rose-800 mt-0.5">
-                  Ordenadas de <strong>más posibles de recuperar por la derecha</strong> (menor déficit de votos y %) a <strong>imposibles</strong>.
-                </p>
-              </div>
-            </div>
-
-            {/* Batch action button for left-winning plazas */}
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <button
-                onClick={handleWithdrawAllLeftWinning}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
-                title="Retira a VOX en todas las circunscripciones donde vence la izquierda y transfiere 100% de votos al PP"
-              >
-                <Zap className="h-3.5 w-3.5 text-amber-300" />
-                <span>Retirar VOX en todas estas plazas</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-mono">
-                  <th className="py-3 px-3 text-center w-14">Rango</th>
-                  <th className="py-3 px-4">Circunscripción</th>
-                  <th className="py-3 px-3 text-center">Escaños Derecha</th>
-                  <th className="py-3 px-3">Déficit / Transición</th>
-                  <th className="py-3 px-4">Contienda Decisiva</th>
-                  <th className="py-3 px-4 text-right">Intervalo % para Remontar</th>
-                  <th className="py-3 px-4 text-center">Opción VOX</th>
-                  <th className="py-3 px-3 text-center w-12">Detalle</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
-                {filteredLeftList.map((item, idx) => {
-                  const seatBlocks: { party: string; color: string }[] = [];
-                  ORDER.forEach(p => {
-                    const count = item.seatsDistribution[p] || 0;
-                    for (let i = 0; i < count; i++) {
-                      seatBlocks.push({ party: p, color: PARTY_COLORS[p] || '#64748b' });
-                    }
-                  });
-
-                  return (
-                    <tr
-                      key={item.name}
-                      onClick={() => handleOpenConstituency(item.name)}
-                      className={`hover:bg-rose-50/40 transition-colors cursor-pointer group ${
-                        item.voxWithdrawn ? 'bg-emerald-50/20' : ''
-                      }`}
-                    >
-                      {/* Rank */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full font-bold text-xs bg-rose-100 text-rose-800 font-mono">
-                          {idx + 1}
-                        </span>
-                      </td>
-
-                      {/* Province */}
-                      <td className="py-3.5 px-4 font-sans">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-sm text-slate-900 group-hover:text-rose-700 transition-colors">
-                              {formatConstituencyName(item.name)}
-                            </span>
-                            <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {getConstituencyCCAA(item.name)}
-                            </span>
-                            <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {item.n} esc.
-                            </span>
-                            {item.voxWithdrawn && (
-                              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
-                                VOX retirado
-                              </span>
-                            )}
-                          </div>
-                          {/* Seat Dots */}
-                          <div className="flex items-center gap-1 mt-1.5">
-                            {seatBlocks.map((b, bIdx) => (
-                              <span
-                                key={bIdx}
-                                className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-extrabold text-white shadow-2xs"
-                                style={{ backgroundColor: b.color }}
-                                title={b.party}
-                              >
-                                {b.party.slice(0, 1)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Seats Right vs Max */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold font-mono bg-rose-50 text-rose-800 border border-rose-200">
-                          {item.currentRightSeats} / {item.maxRightSeats}
-                        </span>
-                      </td>
-
-                      {/* Transition & Feasibility */}
-                      <td className="py-3.5 px-3 font-sans">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-bold text-rose-800">
-                            {item.feasibilityLabel}
-                          </span>
-                          <span className="text-[11px] font-mono text-slate-500">
-                            {item.scenarioTransition}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Decisive Contest */}
-                      <td className="py-3.5 px-4 font-sans text-xs">
-                        <div className="flex flex-col text-slate-700">
-                          <span className="font-semibold text-slate-900">
-                            Aspirante Derecha: {item.firstRightChallenger?.g ?? 'PP'} ({item.firstRightChallenger?.f.toLocaleString('es-ES') ?? '–'} votos)
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            vs último electo rival: {item.lastNonRightElected?.g ?? '–'} ({item.lastNonRightElected?.f.toLocaleString('es-ES') ?? '–'} votos)
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Interval % to Recover */}
-                      <td className="py-3.5 px-4 text-right font-mono">
-                        <div className="flex flex-col items-end">
-                          <span className="text-xs font-bold text-rose-700">
-                            Déficit: -{item.marginToGainVotes?.toLocaleString('es-ES') ?? '–'} votos
-                          </span>
-                          <span className="text-[11px] font-extrabold text-rose-800">
-                            +{item.marginToGainPct?.toFixed(2) ?? '–'} % necesario
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* VOX Candidate Toggle Option */}
-                      <td className="py-3.5 px-4 text-center">
-                        {item.hasVoxCandidates ? (
-                          item.voxWithdrawn ? (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                onToggleVoxWithdraw(item.name);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer shadow-2xs"
-                              title="Haz clic para volver a presentar a VOX en esta circunscripción"
-                            >
-                              <Check className="h-3 w-3 text-emerald-700" />
-                              <span>{item.name.includes('FORMENTERA') ? 'Retirado (100% Sa Unió)' : 'Retirado (100% PP)'}</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                onToggleVoxWithdraw(item.name);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors cursor-pointer shadow-2xs"
-                              title={`Retirar lista de VOX: pasaría ~${item.estimatedVoxVotes.toLocaleString('es-ES')} votos al PP`}
-                            >
-                              <Zap className="h-3 w-3 text-amber-500" />
-                              <span>Retirar VOX (~{Math.round(item.estimatedVoxVotes / 1000)}k)</span>
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            Sin lista VOX
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Action Chevron */}
-                      <td className="py-3.5 px-3 text-center text-slate-400 group-hover:text-rose-600 transition-colors">
-                        <ChevronRight className="h-4 w-4 inline" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredLeftList.length === 0 && (
-            <div className="p-6 text-center text-slate-500 text-xs">
-              No se han encontrado circunscripciones con victoria de la izquierda con los filtros actuales.
-            </div>
-          )}
-        </div>
+      {(mode === 'all' || mode === 'left') && (
+        <RiskTable
+          kind="left"
+          title="Donde gana la izquierda"
+          sub="De la más fácil de recuperar a la más difícil. Cuenta cuántos votos le faltan a la derecha para sumar el escaño que le falta."
+          items={left}
+          onOpen={open}
+          onToggle={onToggleVoxWithdraw}
+          action={
+            <Pill onClick={() => addWithdrawn(r.leftWinningList.filter(i => i.hasVoxCandidates).map(i => i.name))} title="Retira a VOX en todas estas provincias">
+              Retirar VOX en todas
+            </Pill>
+          }
+        />
       )}
 
-      {/* SECTION 2: WHERE RIGHT HAS MAJORITY (SORTED FROM MOST CRITICAL TO SAFEST) */}
-      {(viewMode === 'all' || viewMode === 'right_majority') && (
-        <div className="rounded-2xl border-2 border-blue-200 bg-white overflow-hidden shadow-sm">
-          {/* Section Header */}
-          <div className="p-5 border-b border-blue-100 bg-blue-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs">
-                2
-              </span>
-              <div>
-                <h3 className="text-base font-extrabold text-blue-950 tracking-tight flex items-center gap-2">
-                  <span>Plazas donde la Mayoría la tiene la Derecha</span>
-                  <span className="text-xs font-mono font-bold bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded-full">
-                    {filteredRightList.length} circunscripciones
-                  </span>
-                </h3>
-                <p className="text-xs text-blue-800 mt-0.5">
-                  Ordenadas de <strong>más críticas para la derecha</strong> (menor colchón de ventaja) hasta <strong>más seguras</strong> (bastiones).
-                </p>
-              </div>
-            </div>
-
-            {/* Batch action for critical plazas */}
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <button
-                onClick={handleWithdrawAllCritical}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
-                title="Retira a VOX en todas las plazas críticas (< 2%) para blindar el 3-1 o 2-1"
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
-                <span>Blindar plazas críticas (&lt; 2%)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-mono">
-                  <th className="py-3 px-3 text-center w-14">Rango</th>
-                  <th className="py-3 px-4">Circunscripción</th>
-                  <th className="py-3 px-3 text-center">Escaños Derecha</th>
-                  <th className="py-3 px-3">Nivel de Riesgo</th>
-                  <th className="py-3 px-4">Contienda Decisiva</th>
-                  <th className="py-3 px-4 text-right">Intervalo % de Ventaja</th>
-                  <th className="py-3 px-4 text-center">Opción VOX</th>
-                  <th className="py-3 px-3 text-center w-12">Detalle</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
-                {filteredRightList.map((item, idx) => {
-                  const isCritical = item.riskCategory === 'critical';
-                  const isModerate = item.riskCategory === 'moderate';
-
-                  const seatBlocks: { party: string; color: string }[] = [];
-                  ORDER.forEach(p => {
-                    const count = item.seatsDistribution[p] || 0;
-                    for (let i = 0; i < count; i++) {
-                      seatBlocks.push({ party: p, color: PARTY_COLORS[p] || '#64748b' });
-                    }
-                  });
-
-                  return (
-                    <tr
-                      key={item.name}
-                      onClick={() => handleOpenConstituency(item.name)}
-                      className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${
-                        item.voxWithdrawn ? 'bg-emerald-50/20' : ''
-                      }`}
-                    >
-                      {/* Rank */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-bold text-xs font-mono ${
-                            isCritical
-                              ? 'bg-amber-100 text-amber-800'
-                              : isModerate
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {idx + 1}
-                        </span>
-                      </td>
-
-                      {/* Province */}
-                      <td className="py-3.5 px-4 font-sans">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors">
-                              {formatConstituencyName(item.name)}
-                            </span>
-                            <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {getConstituencyCCAA(item.name)}
-                            </span>
-                            <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {item.n} esc.
-                            </span>
-                            {item.voxWithdrawn && (
-                              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
-                                VOX retirado
-                              </span>
-                            )}
-                          </div>
-                          {/* Seat Dots */}
-                          <div className="flex items-center gap-1 mt-1.5">
-                            {seatBlocks.map((b, bIdx) => (
-                              <span
-                                key={bIdx}
-                                className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-extrabold text-white shadow-2xs"
-                                style={{ backgroundColor: b.color }}
-                                title={b.party}
-                              >
-                                {b.party.slice(0, 1)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Seats Right vs Max */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
-                          {item.currentRightSeats} / {item.maxRightSeats}
-                        </span>
-                      </td>
-
-                      {/* Risk Category & Transition */}
-                      <td className="py-3.5 px-3 font-sans">
-                        <div className="flex flex-col gap-0.5">
-                          <span
-                            className={`text-xs font-bold ${
-                              isCritical
-                                ? 'text-amber-800 font-extrabold flex items-center gap-1'
-                                : isModerate
-                                ? 'text-yellow-800'
-                                : 'text-emerald-800'
-                            }`}
-                          >
-                            {isCritical && <Flame className="h-3.5 w-3.5 text-amber-600" />}
-                            {item.riskCategoryLabel}
-                          </span>
-                          <span className="text-[11px] font-mono text-slate-500">
-                            Peligro: {item.scenarioTransition}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Decisive Contest */}
-                      <td className="py-3.5 px-4 font-sans text-xs">
-                        <div className="flex flex-col text-slate-700">
-                          <span className="font-semibold text-slate-900">
-                            Último electo: {item.lastRightElected?.g ?? 'PP'} ({item.lastRightElected?.f.toLocaleString('es-ES') ?? '–'} votos)
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            vs 1.er aspirante rival: {item.firstNonRightChallenger?.g ?? '–'} ({item.firstNonRightChallenger?.f.toLocaleString('es-ES') ?? '–'} votos)
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Interval % to Lose */}
-                      <td className="py-3.5 px-4 text-right font-mono">
-                        <div className="flex flex-col items-end">
-                          <span
-                            className={`text-xs font-bold ${
-                              isCritical
-                                ? 'text-amber-800 font-extrabold'
-                                : isModerate
-                                ? 'text-yellow-800 font-bold'
-                                : 'text-emerald-800'
-                            }`}
-                          >
-                            Colchón: +{item.marginToLoseVotes?.toLocaleString('es-ES') ?? '–'} votos
-                          </span>
-                          <span
-                            className={`text-[11px] font-extrabold ${
-                              isCritical
-                                ? 'text-amber-900'
-                                : isModerate
-                                ? 'text-yellow-900'
-                                : 'text-slate-500 font-semibold'
-                            }`}
-                          >
-                            +{item.marginToLosePct?.toFixed(2) ?? '–'} % margen
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* VOX Candidate Toggle Option */}
-                      <td className="py-3.5 px-4 text-center">
-                        {item.hasVoxCandidates ? (
-                          item.voxWithdrawn ? (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                onToggleVoxWithdraw(item.name);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-colors cursor-pointer shadow-2xs"
-                              title="Haz clic para volver a presentar a VOX en esta circunscripción"
-                            >
-                              <Check className="h-3 w-3 text-emerald-700" />
-                              <span>{item.name.includes('FORMENTERA') ? 'Retirado (100% Sa Unió)' : 'Retirado (100% PP)'}</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                onToggleVoxWithdraw(item.name);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors cursor-pointer shadow-2xs"
-                              title={`Retirar lista de VOX: pasaría ~${item.estimatedVoxVotes.toLocaleString('es-ES')} votos al PP`}
-                            >
-                              <ShieldCheck className="h-3 w-3 text-blue-600" />
-                              <span>Retirar VOX (~{Math.round(item.estimatedVoxVotes / 1000)}k)</span>
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            Sin lista VOX
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Action Chevron */}
-                      <td className="py-3.5 px-3 text-center text-slate-400 group-hover:text-blue-600 transition-colors">
-                        <ChevronRight className="h-4 w-4 inline" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredRightList.length === 0 && (
-            <div className="p-6 text-center text-slate-500 text-xs">
-              No se han encontrado circunscripciones con mayoría de la derecha con los filtros actuales.
-            </div>
-          )}
-        </div>
+      {(mode === 'all' || mode === 'right') && (
+        <RiskTable
+          kind="right"
+          title="Donde manda la derecha"
+          sub="De la que más peligra a la más segura. El colchón son los votos de ventaja antes de perder un escaño."
+          items={right}
+          onOpen={open}
+          onToggle={onToggleVoxWithdraw}
+          action={
+            <Pill
+              onClick={() => addWithdrawn(r.rightWinningList.filter(i => i.riskCategory === 'critical' && i.hasVoxCandidates).map(i => i.name))}
+              title="Retira a VOX donde el margen es menor del 2 %"
+            >
+              Blindar las críticas
+            </Pill>
+          }
+        />
       )}
 
-      {/* Candidate Detail Modal */}
-      <ConstituencyDetailModal
-        constituency={selectedConstituency}
-        onClose={() => setSelectedConstituency(null)}
-        onToggleVoxWithdraw={onToggleVoxWithdraw}
-      />
+      <ConstituencyDetailModal constituency={selected} onClose={() => setSelected(null)} onToggleVoxWithdraw={onToggleVoxWithdraw} />
     </div>
   );
 };

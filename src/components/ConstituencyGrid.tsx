@@ -1,315 +1,123 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ArrowRightLeft, AlertTriangle, MapPin } from 'lucide-react';
 import { ConstituencyResult } from '../engine/senateEngine';
-import {
-  PARTY_COLORS,
-  formatConstituencyName,
-  ORDER,
-  getConstituencyCCAA
-} from '../data/electionData';
+import { formatConstituencyName, getConstituencyCCAA, PARTY_COLORS } from '../data/electionData';
 import { ConstituencyDetailModal } from './ConstituencyDetailModal';
+import { CARD, Delta, Pill, SearchBox, SeatDots, SectionHead } from './ui';
 
-interface ConstituencyGridProps {
+interface Props {
   constituencies: ConstituencyResult[];
   onToggleVoxWithdraw?: (name: string) => void;
 }
 
-type FilterType = 'all' | 'flipped' | 'tight' | 'vox_withdrawn' | 'pp_lead' | 'sdp_lead';
+type Filter = 'all' | 'flipped' | 'tight' | 'vox';
+const collator = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
 
-export const ConstituencyGrid: React.FC<ConstituencyGridProps> = ({
-  constituencies,
-  onToggleVoxWithdraw
-}) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<FilterType>('all');
-  const [selectedCCAA, setSelectedCCAA] = useState<string>('all');
-  const [selectedConstituency, setSelectedConstituency] = useState<ConstituencyResult | null>(null);
+export const ConstituencyGrid: React.FC<Props> = ({ constituencies, onToggleVoxWithdraw }) => {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [ccaa, setCcaa] = useState('all');
+  const [selected, setSelected] = useState<ConstituencyResult | null>(null);
 
-  // Filtered and searched list
-  const filteredList = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+  const list = useMemo(() => {
+    const q = query.toLowerCase().trim();
     return constituencies.filter(c => {
-      const name = formatConstituencyName(c.name).toLowerCase();
-      const ccaa = getConstituencyCCAA(c.name).toLowerCase();
-
-      // Search by province or CCAA
-      if (q && !name.includes(q) && !ccaa.includes(q)) return false;
-
-      // Filter by selected CCAA dropdown/selector if active
-      if (selectedCCAA !== 'all' && getConstituencyCCAA(c.name) !== selectedCCAA) {
-        return false;
-      }
-
-      // Filter types
-      if (filterType === 'flipped') return c.isFlipped;
-      if (filterType === 'tight') return c.isTight;
-      if (filterType === 'vox_withdrawn') return c.voxWithdrawn;
-      if (filterType === 'pp_lead') return (c.tally['PP'] || 0) >= 3 || (c.tally['PP'] || 0) >= c.n;
-      if (filterType === 'sdp_lead') {
-        const sdpSeats = (c.tally['SdP'] || 0) + (c.tally['PSOE'] || 0) + (c.tally['PSC'] || 0);
-        return sdpSeats >= 3 || sdpSeats >= c.n;
-      }
-
+      const region = getConstituencyCCAA(c.name);
+      if (q && !formatConstituencyName(c.name).toLowerCase().includes(q) && !region.toLowerCase().includes(q)) return false;
+      if (ccaa !== 'all' && region !== ccaa) return false;
+      if (filter === 'flipped') return c.isFlipped;
+      if (filter === 'tight') return c.isTight;
+      if (filter === 'vox') return c.voxWithdrawn;
       return true;
     });
-  }, [constituencies, searchQuery, filterType, selectedCCAA]);
+  }, [constituencies, query, filter, ccaa]);
 
-  // Grouped by CCAA in alphabetical order, and provinces inside each CCAA sorted alphabetically
-  const groupedByCCAA = useMemo(() => {
-    const groups: Record<string, ConstituencyResult[]> = {};
-    filteredList.forEach(c => {
-      const ccaa = getConstituencyCCAA(c.name);
-      (groups[ccaa] = groups[ccaa] || []).push(c);
-    });
-
-    const sortedCCAA = Object.keys(groups).sort((a, b) =>
-      a.localeCompare(b, 'es', { sensitivity: 'base' })
-    );
-
-    return sortedCCAA.map(ccaa => ({
-      ccaa,
-      items: groups[ccaa].sort((a, b) =>
-        formatConstituencyName(a.name).localeCompare(
-          formatConstituencyName(b.name),
-          'es',
-          { sensitivity: 'base' }
-        )
-      )
+  const groups = useMemo(() => {
+    const g: Record<string, ConstituencyResult[]> = {};
+    list.forEach(c => { (g[getConstituencyCCAA(c.name)] ||= []).push(c); });
+    return Object.keys(g).sort(collator).map(k => ({
+      ccaa: k,
+      items: g[k].sort((a, b) => collator(formatConstituencyName(a.name), formatConstituencyName(b.name)))
     }));
-  }, [filteredList]);
+  }, [list]);
 
-  // List of all CCAAs present for the filter dropdown
-  const allCCAAs = useMemo(() => {
-    const set = new Set<string>();
-    constituencies.forEach(c => set.add(getConstituencyCCAA(c.name)));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-  }, [constituencies]);
-
-  const flippedCount = useMemo(() => constituencies.filter(c => c.isFlipped).length, [constituencies]);
-  const tightCount = useMemo(() => constituencies.filter(c => c.isTight).length, [constituencies]);
-  const voxWithdrawnCount = useMemo(() => constituencies.filter(c => c.voxWithdrawn).length, [constituencies]);
+  const regions = useMemo(() => Array.from(new Set(constituencies.map(c => getConstituencyCCAA(c.name)))).sort(collator), [constituencies]);
+  const count = (f: (c: ConstituencyResult) => boolean) => constituencies.filter(f).length;
+  const voxCount = count(c => c.voxWithdrawn);
 
   return (
-    <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      {/* Header and Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-blue-600" />
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">
-              Mapa de Circunscripciones por Comunidades Autónomas ({filteredList.length} de {constituencies.length})
-            </h3>
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Provincias ordenadas alfabéticamente dentro de sus respectivas Comunidades Autónomas.
-          </p>
-        </div>
+    <div className={`${CARD} space-y-5`}>
+      <SectionHead
+        title="Circunscripciones"
+        sub={`${list.length} de ${constituencies.length}. Toca una para ver los votos candidato a candidato.`}
+      />
 
-        {/* Search & Filter Bar */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* CCAA Filter Select */}
-          <select
-            value={selectedCCAA}
-            onChange={e => setSelectedCCAA(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 py-1.5 px-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold cursor-pointer"
-          >
-            <option value="all">Todas las CCAA (19)</option>
-            {allCCAAs.map(ccaa => (
-              <option key={ccaa} value={ccaa}>
-                {ccaa}
-              </option>
-            ))}
-          </select>
-
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar provincia o CCAA..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-44 sm:w-52"
-            />
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer ${
-                filterType === 'all'
-                  ? 'bg-white text-slate-900 font-bold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Todas (59)
-            </button>
-            <button
-              onClick={() => setFilterType('flipped')}
-              className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                filterType === 'flipped'
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Circunscripciones donde cambia la asignación de escaños respecto a 2023"
-            >
-              <ArrowRightLeft className="h-3 w-3" />
-              <span>Cambian ({flippedCount})</span>
-            </button>
-            <button
-              onClick={() => setFilterType('tight')}
-              className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                filterType === 'tight'
-                  ? 'bg-rose-600 text-white font-bold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Margen de corte menor a 3.000 votos"
-            >
-              <AlertTriangle className="h-3 w-3" />
-              <span>Ajustadas ({tightCount})</span>
-            </button>
-            {voxWithdrawnCount > 0 && (
-              <button
-                onClick={() => setFilterType('vox_withdrawn')}
-                className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                  filterType === 'vox_withdrawn'
-                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                    : 'text-emerald-800 hover:bg-emerald-50'
-                }`}
-                title="Circunscripciones con lista de VOX retirada"
-              >
-                <span>VOX Ret. ({voxWithdrawnCount})</span>
-              </button>
-            )}
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={ccaa}
+          onChange={e => setCcaa(e.target.value)}
+          aria-label="Comunidad autónoma"
+          className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 cursor-pointer"
+        >
+          <option value="all">Todas las comunidades</option>
+          {regions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <SearchBox value={query} onChange={setQuery} placeholder="Buscar provincia" />
+        <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
+        <Pill active={filter === 'all'} onClick={() => setFilter('all')}>Todas</Pill>
+        <Pill active={filter === 'flipped'} onClick={() => setFilter('flipped')} title="Cambian de reparto respecto a 2023">
+          Cambian ({count(c => c.isFlipped)})
+        </Pill>
+        <Pill active={filter === 'tight'} onClick={() => setFilter('tight')} title="Margen de corte menor de 3.000 votos">
+          Ajustadas ({count(c => c.isTight)})
+        </Pill>
+        {voxCount > 0 && (
+          <Pill active={filter === 'vox'} onClick={() => setFilter('vox')}>VOX retirado ({voxCount})</Pill>
+        )}
       </div>
 
-      {/* Grouped by CCAA in Alphabetical Order */}
-      <div className="mt-6 space-y-7">
-        {groupedByCCAA.map(({ ccaa, items }) => (
-          <div key={ccaa} className="space-y-3">
-            {/* CCAA Header Badge */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm text-slate-900 tracking-tight">
-                  {ccaa}
-                </span>
-                <span className="text-[11px] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md">
-                  {items.length} {items.length === 1 ? 'circunscripción' : 'circunscripciones'}
-                </span>
-              </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                {items.reduce((acc, c) => acc + c.n, 0)} senadores
+      <div className="space-y-6">
+        {groups.map(({ ccaa: region, items }) => (
+          <section key={region}>
+            <h3 className="mb-2 flex items-baseline gap-2 border-b border-slate-100 pb-1.5 text-base font-semibold text-slate-950">
+              {region}
+              <span className="text-xs font-normal text-slate-400 tabular-nums">
+                {items.length} {items.length === 1 ? 'circunscripción' : 'circunscripciones'} · {items.reduce((a, c) => a + c.n, 0)} senadores
               </span>
-            </div>
-
-            {/* Grid of Provinces sorted alphabetically within this CCAA */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
-              {items.map(c => {
-                const name = formatConstituencyName(c.name);
-                const hasDiff = c.diff.length > 0;
-                const isTight = c.isTight;
-
-                // Ordered seat dots
-                const seatDots: { party: string; color: string }[] = [];
-                ORDER.forEach(p => {
-                  const count = c.tally[p] || 0;
-                  for (let i = 0; i < count; i++) {
-                    seatDots.push({ party: p, color: PARTY_COLORS[p] || '#64748b' });
-                  }
-                });
-
-                return (
-                  <button
-                    key={c.name}
-                    onClick={() => setSelectedConstituency(c)}
-                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all cursor-pointer group ${
-                      hasDiff
-                        ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400 hover:shadow-md'
-                        : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                        {name}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {c.voxWithdrawn && (
-                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-300">
-                            VOX ret.
-                          </span>
-                        )}
-                        <span className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                          {c.n} esc.
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Seat Dots in Full Party Color */}
-                    <div className="flex items-center gap-1.5 mt-2.5">
-                      {seatDots.map((dot, idx) => (
-                        <span
-                          key={idx}
-                          className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-extrabold text-white shadow-2xs transition-transform group-hover:scale-110"
-                          style={{ backgroundColor: dot.color }}
-                          title={dot.party}
-                        >
-                          {dot.party.slice(0, 1)}
+            </h3>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map(c => (
+                <button
+                  key={c.name}
+                  onClick={() => setSelected(c)}
+                  style={c.isFlipped ? { boxShadow: 'inset 3px 0 0 #a9741a' } : undefined}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:border-slate-900 cursor-pointer"
+                >
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-slate-950">{formatConstituencyName(c.name)}</span>
+                    <span className={`shrink-0 text-xs tabular-nums ${c.isTight ? 'font-semibold text-brass' : 'text-slate-400'}`} title="Margen de corte en votos">
+                      {c.margin !== null ? `±${(c.margin / 1000).toFixed(1).replace('.', ',')}k` : '–'}
+                    </span>
+                  </span>
+                  <span className="mt-1.5 flex items-center justify-between gap-2">
+                    <SeatDots tally={c.tally} />
+                    <span className="flex items-center gap-2 text-xs">
+                      {c.voxWithdrawn && <span className="font-semibold" style={{ color: PARTY_COLORS['VOX'] }}>sin VOX</span>}
+                      {c.diff.map(([p, d]) => (
+                        <span key={p} className="flex items-center gap-0.5 font-semibold" style={{ color: PARTY_COLORS[p] }}>
+                          <Delta d={d} />{p}
                         </span>
                       ))}
-                    </div>
-
-                    {/* Status / Margin Footer */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono">
-                      {hasDiff ? (
-                        <div className="flex items-center gap-1 truncate max-w-[130px]">
-                          {c.diff.map(([p, d]) => (
-                            <span
-                              key={p}
-                              style={{ color: PARTY_COLORS[p] || '#b45309' }}
-                              className="font-bold"
-                            >
-                              {d > 0 ? '+' : ''}{d} {p}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">
-                          Igual que 2023
-                        </span>
-                      )}
-
-                      <span
-                        className={`tabular-nums font-semibold ${
-                          isTight ? 'text-rose-600 font-extrabold' : 'text-slate-500'
-                        }`}
-                        title="Diferencia de votos con el primer candidato que no obtiene escaño"
-                      >
-                        {c.margin !== null ? `±${(c.margin / 1000).toFixed(1)}k` : '–'}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+                    </span>
+                  </span>
+                </button>
+              ))}
             </div>
-          </div>
+          </section>
         ))}
+        {groups.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No hay circunscripciones con esos filtros.</p>}
       </div>
 
-      {filteredList.length === 0 && (
-        <div className="p-8 text-center text-slate-500 text-sm">
-          No se encontraron circunscripciones con los criterios de búsqueda actuales.
-        </div>
-      )}
-
-      {/* Modal Details */}
-      <ConstituencyDetailModal
-        constituency={selectedConstituency}
-        onClose={() => setSelectedConstituency(null)}
-        onToggleVoxWithdraw={onToggleVoxWithdraw}
-      />
+      <ConstituencyDetailModal constituency={selected} onClose={() => setSelected(null)} onToggleVoxWithdraw={onToggleVoxWithdraw} />
     </div>
   );
 };
