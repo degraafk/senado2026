@@ -1,87 +1,21 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Simulador del Senado 2026</title>
-<meta name="description" content="Proyecta el voto nacional de cada partido y calcula cuántos de los 209 senadores obtendría en cada circunscripción.">
-<meta property="og:title" content="Simulador del Senado 2026"><meta property="og:description" content="Proyecta el voto de cada partido y descubre quién ganaría los escaños del Senado, circunscripción a circunscripción.">
-<meta name="theme-color" content="#0a1322">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 24A13 13 0 0 1 29 24' fill='none' stroke='%232f7be0' stroke-width='6'/%3E%3Cpath d='M3 24A13 13 0 0 1 16 11' fill='none' stroke='%23e03a4b' stroke-width='6'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,700&family=Schibsted+Grotesk:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-<header class="hero"><div class="hero-in">
-  <div class="hero-copy">
-    <p class="eyebrow">Elecciones generales · Senado</p>
-    <h1>Simulador del Senado 2026</h1>
-    <p>Cada ciudadano vota hasta tres candidatos y gana quien más votos reúne en su circunscripción. Proyecta el voto nacional de cada partido y mira cuántos de los 209 senadores electos obtiene.</p>
-    <ol class="how"><li>Escribes el % nacional que esperas</li><li>Se escalan los votos de cada candidato de 2023</li><li>Los más votados de cada circunscripción ganan el escaño</li></ol>
-    <div class="bloc"><p><b>Tu bloque</b> · toca partidos en el gráfico o en la leyenda para sumarlos</p><div class="meter" id="meter"></div><div class="verdict" id="verdict"></div></div>
-  </div>
-  <figure class="donut-wrap">
-    <svg id="donut" viewBox="0 0 700 400" role="group" aria-label="Escaños por partido: anillo exterior 2026, anillo interior 2023">
-      <g id="ring23"></g><g id="ring"></g><g id="ticks"></g>
-      <text id="c1" class="c1" x="350" y="318" text-anchor="middle"></text><text id="c2" class="c2" x="350" y="342" text-anchor="middle"></text><text id="c3" class="c3" x="350" y="372" text-anchor="middle"></text>
-    </svg>
-    <div class="legend" id="legend"></div>
-    <p class="cap">Anillo exterior: 2026 · anillo interior fino: Senado de 2023</p>
-    <p class="cap" id="tickleg"></p>
-  </figure>
-</div></header>
-<div class="wrap">
-<aside class="panel">
-  <div class="btns"><button id="r23" title="Restablece los % de 2023 y el voto estratégico a 0 %">Volver a 2023</button><button id="share" class="ico" title="Copia un enlace con tu escenario">Copiar enlace</button></div>
-  <details open><summary>Voto nacional 2026</summary>
-    <p class="hint">Entre paréntesis, el % de 2023. El factor (×) es el cambio respecto a 2023 y se aplica a todos los candidatos del partido.</p>
-    <div id="pcts"></div><div class="sum" id="sum"></div>
-    <p class="hint">Senado de Progreso (PSOE + Frente Amplio unidos). Vacío = se calcula solo; si escribes un valor, sustituye a la suma.</p>
-    <div class="p" style="--c:#b3203a"><b>SdP</b><input type="number" id="sdp" step="0.1" min="0" placeholder="auto"><small id="sdpm"></small></div>
-  </details>
-  <details open><summary>Voto estratégico VOX → PP</summary>
-    <p class="hint">Parte de los votantes de VOX apoya al PP en el Senado. Ese porcentaje de votos pasa a los candidatos del PP de su misma circunscripción.</p>
-    <input type="range" id="X" min="0" max="100" style="width:100%"><div class="sum" id="Xv"></div>
-  </details>
-  <details open><summary>Voto estratégico Frente Amplio → PSOE</summary>
-    <p class="hint">Solo en las 13 circunscripciones donde PSOE y Frente Amplio van por separado: Sevilla, Cáceres, Badajoz, Gran Canaria, Lanzarote, Fuerteventura, Tenerife, La Palma, El Hierro y las cuatro catalanas (PSC). Ese porcentaje de votos de Frente Amplio pasa a los candidatos del PSOE de su circunscripción, en proporción a sus votos de 2023.</p>
-    <input type="range" id="Y" min="0" max="100" style="width:100%"><div class="sum" id="Yv"></div>
-  </details>
-  <details><summary>Partidos sin dato nacional</summary>
-    <p class="hint">Factor directo. 1,00 = mismos votos que en 2023.</p><div id="direct"></div>
-  </details>
-  <details><summary>Ibiza y Formentera por separado</summary>
-    <p class="hint">En 2026 son dos circunscripciones con un senador cada una. Votos de 2023 de cada lista por separado (Ibiza = total de la isla − Formentera):</p>
-    <table class="cand"><tr><th>Lista</th><th>Ibiza</th><th>Formentera</th></tr>
-    <tr><td>PSOE-SUMAR-EUIB-ARA EIVISSA (SdP)</td><td>23.921</td><td>2.014</td></tr>
-    <tr><td>PP</td><td>21.593</td><td>1.525</td></tr><tr><td>VOX</td><td>6.236</td><td>272</td></tr></table>
-  </details>
-  <details><summary>Umbral propio de mayoría</summary>
-    <p class="hint">Se dibuja junto a la mayoría absoluta (105) y los 3/5 de 209 (126).</p>
-    <div class="p" style="--c:#2a5bd7"><b>Escaños</b><input type="number" id="thr" min="1" max="209"></div>
-  </details>
-  <p class="note">Navarra: PP y UPN van en coalición bajo la marca UPN (se suman 1.º con 1.º, 2.º con 2.º y 3.º con 3.º).</p>
-</aside>
-<div class="main">
-  <section class="panel">
-    <h2>Resultado por partido</h2><p class="sub">Comparado con el Senado de 2023 según la hoja «Resumen2023» del Excel: el PSOE cuenta como SdP donde en 2026 va unido con Frente Amplio, y como PSOE o PSC donde van por separado. El escaño que ganó Eivissa i Formentera al Senat en 2023 figura como SdP en el Excel. Formentera no existía en 2023.</p>
-    <table id="tot"></table>
-  </section>
-  <section class="panel">
-    <h2>Resultado por circunscripción</h2>
-    <p class="sub">Toca una tarjeta para ver los candidatos. Margen: votos que separan al último elegido del primero que se queda fuera.</p>
-    <div class="btns"><input type="search" id="q" placeholder="Buscar circunscripción" aria-label="Buscar circunscripción">
-    <button data-f="all" class="on">Todas</button><button data-f="chg">Cambian de color</button><button data-f="tight">Ajustadas (&lt; 3.000 votos)</button></div>
-    <div class="grid" id="cons"></div>
-  </section>
-</div>
-</div>
-<div id="toast" role="status" aria-live="polite"></div>
-<dialog id="dlg"><div id="dbody"></div><div class="btns"><button onclick="dlg.close()">Cerrar</button></div></dialog>
-<footer>Datos de 2023: BOE (Junta Electoral Central). Modelo de proyección propio: multiplicadores nacionales por partido sobre los votos de cada candidato.</footer>
-<script src="data.js"></script>
-<script src="engine.js"></script>
-<script src="app.js"></script>
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulador Senado de España</title>
+    <meta name="description" content="Simulador interactivo del Senado español: proyección de escaños por circunscripción, análisis de mayorías (133 escaños) y comparativa con las elecciones generales de 2023." />
+    <meta property="og:title" content="Simulador Senado de España" />
+    <meta property="og:description" content="Simulador interactivo del Senado español: proyección de escaños por circunscripción, análisis de mayorías (133 escaños) y comparativa con las elecciones generales de 2023." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
+

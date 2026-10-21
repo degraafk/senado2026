@@ -1,0 +1,6 @@
+{
+  "name": "Simulador Senado de España",
+  "description": "Simulador interactivo del Senado español: proyección de escaños por circunscripción, análisis de mayorías (133 escaños) y comparativa con las elecciones generales de 2023.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
