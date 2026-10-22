@@ -4,6 +4,7 @@ import { ModelResult, ConstituencyResult } from '../engine/senateEngine';
 import { computeRightWingRiskAnalysis, ConstituencyRiskProfile } from '../engine/riskAnalysis';
 import { PARTY_COLORS, formatConstituencyName, getConstituencyCCAA, getPartyTint } from '../data/electionData';
 import { ConstituencyDetailModal } from './ConstituencyDetailModal';
+import { SpainMap, MapLegend, MapMode } from './SpainMap';
 import { CARD, Pill, SearchBox, SeatDots, dec, fmt } from './ui';
 
 interface Props {
@@ -120,6 +121,7 @@ const RiskTable: React.FC<TableProps> = ({ title, sub, items, kind, action, onOp
 export const RightRiskRankingView: React.FC<Props> = ({ result, voxWithdraw, onToggleVoxWithdraw, onSetVoxWithdraw }) => {
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<Mode>('all');
+  const [mapMode, setMapMode] = useState<MapMode>('risk');
   const [selected, setSelected] = useState<ConstituencyResult | null>(null);
 
   const r = useMemo(() => computeRightWingRiskAnalysis(result), [result]);
@@ -153,6 +155,23 @@ export const RightRiskRankingView: React.FC<Props> = ({ result, voxWithdraw, onT
           </div>
         ))}
       </div>
+
+      <section className={`${CARD} space-y-4`}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-950">El mapa del riesgo</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {mapMode === 'risk' ? 'Toca una provincia para ver sus votos.' : 'Toca una provincia para retirar o devolver a VOX.'}
+            </p>
+          </div>
+          <div className="flex gap-1.5">
+            <Pill active={mapMode === 'risk'} onClick={() => setMapMode('risk')}>Riesgo</Pill>
+            <Pill active={mapMode === 'vox'} onClick={() => setMapMode('vox')}>Retirada de VOX</Pill>
+          </div>
+        </div>
+        <SpainMap result={result} mode={mapMode} onSelect={setSelected} onToggleVox={onToggleVoxWithdraw} />
+        <MapLegend mode={mapMode} />
+      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchBox value={query} onChange={setQuery} placeholder="Buscar provincia" />

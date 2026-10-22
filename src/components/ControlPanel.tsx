@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { ModelInput, ModelResult } from '../engine/senateEngine';
-import {
-  BASEDATA, NATIONAL_PARTIES, DIRECT_PARTIES, PARTY_COLORS, getPartyTint,
-  formatConstituencyName, getConstituencyCCAA
-} from '../data/electionData';
+import { BASEDATA, NATIONAL_PARTIES, DIRECT_PARTIES, PARTY_COLORS } from '../data/electionData';
 import { computeRightWingRiskAnalysis } from '../engine/riskAnalysis';
-import { CARD, Pill, SearchBox, dec } from './ui';
+import { CARD, Pill, dec } from './ui';
+import { SpainMap, MapLegend } from './SpainMap';
 
 interface ControlPanelProps {
   input: ModelInput;
@@ -34,7 +32,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   input, result, onChange, onToggleVoxWithdraw, onSetVoxWithdraw
 }) => {
   const [showDirect, setShowDirect] = useState(false);
-  const [voxSearch, setVoxSearch] = useState('');
 
   const baseMult: Record<string, number | 'n/d'> = {};
   BASEDATA.mult.forEach(m => { baseMult[m.g] = m.b; });
@@ -50,25 +47,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const sdpPct = ((input.pct.PSOE || 0) + (input.pct['Frente Amplio'] || 0)) * 100;
   const voxSet = useMemo(() => new Set(input.voxWithdraw || []), [input.voxWithdraw]);
 
-  const circs = useMemo(
-    () => result.cons.map(c => ({
-      name: c.name,
-      clean: formatConstituencyName(c.name),
-      hasVox: c.list.some(x => x.g === 'VOX')
-    })),
+  const withVox = useMemo(
+    () => result.cons.filter(c => c.list.some(x => x.g === 'VOX')).map(c => c.name),
     [result.cons]
   );
-
-  const grouped = useMemo(() => {
-    const q = voxSearch.toLowerCase().trim();
-    const groups: Record<string, typeof circs> = {};
-    circs
-      .filter(c => !q || c.clean.toLowerCase().includes(q) || getConstituencyCCAA(c.name).toLowerCase().includes(q))
-      .forEach(c => { (groups[getConstituencyCCAA(c.name)] ||= []).push(c); });
-    return Object.keys(groups)
-      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
-      .map(ccaa => ({ ccaa, items: groups[ccaa].sort((a, b) => a.clean.localeCompare(b.clean, 'es', { sensitivity: 'base' })) }));
-  }, [circs, voxSearch]);
 
   const setWithdrawn = (names: string[]) =>
     onSetVoxWithdraw ? onSetVoxWithdraw(names) : onChange({ ...input, voxWithdraw: names });
@@ -84,7 +66,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     addWithdrawn(computeRightWingRiskAnalysis(result).rightWinningList.filter(p => p.riskCategory === 'critical' && p.hasVoxCandidates).map(p => p.name));
   const leftWins = () =>
     addWithdrawn(computeRightWingRiskAnalysis(result).leftWinningList.filter(p => p.hasVoxCandidates).map(p => p.name));
-  const all = () => setWithdrawn(circs.filter(c => c.hasVox).map(c => c.name));
+  const all = () => setWithdrawn(withVox);
 
   const X = Math.round(input.X * 100);
   const Y = Math.round(input.Y * 100);
@@ -97,7 +79,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-2xl font-semibold text-slate-950">Ajusta el voto</h2>
-            <p className="text-sm text-slate-500">Porcentaje nacional de cada partido en 2026. Entre paréntesis, el de 2023.</p>
+            <p className="text-sm text-slate-500">Porcentaje nacional de cada partido en 2026. La marca negra del deslizador es el resultado de 2023.</p>
           </div>
           <span className={`text-sm font-semibold tabular-nums ${overHundred ? 'text-brass' : 'text-slate-600'}`}>
             Suma {dec(totalPct * 100, 1)} %{overHundred && ' (pasa del 100 %)'}
@@ -112,20 +94,28 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             const color = PARTY_COLORS[party] || '#667068';
             const max = base && base > 5 ? 50 : 6;
             return (
-              <div key={party} className="grid grid-cols-[minmax(0,5.5rem)_1fr_4rem_3rem] items-center gap-3 border-b border-slate-100 py-2">
+              <div key={party} className="grid grid-cols-[minmax(0,5rem)_1fr_4rem_3rem] items-center gap-3 border-b border-slate-100 py-1.5">
                 <span className="min-w-0">
                   <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                     {party}
                   </span>
-                  {base !== null && <span className="block pl-[18px] text-[11px] text-slate-400">({dec(base, 1)})</span>}
                 </span>
-                <input
-                  type="range" min="0" max={max} step="0.1" value={Math.min(cur, max)}
-                  onChange={e => setPct(party, parseFloat(e.target.value))}
-                  className="custom-range-slider" style={track(Math.min(cur, max), max, color)}
-                  aria-label={`Porcentaje de ${party}`}
-                />
+                <span className="relative block">
+                  <input
+                    type="range" min="0" max={max} step="0.1" value={Math.min(cur, max)}
+                    onChange={e => setPct(party, parseFloat(e.target.value))}
+                    className="custom-range-slider" style={track(Math.min(cur, max), max, color)}
+                    aria-label={`Porcentaje de ${party}`}
+                  />
+                  {base !== null && base <= max && (
+                    <span
+                      className="pointer-events-none absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2 rounded bg-slate-900/70"
+                      style={{ left: `calc(${(base / max) * 100}% + ${(0.5 - base / max) * 20}px)` }}
+                      title={`2023: ${dec(base, 1)} %`}
+                    />
+                  )}
+                </span>
                 <span className="flex items-center justify-end gap-0.5">
                   <input
                     type="number" step="0.1" min="0" max="100" value={+cur.toFixed(1)}
@@ -175,14 +165,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </section>
 
-      {/* 3. VOX withdrawal */}
+      {/* 3. VOX withdrawal, on the map */}
       <section className="border-t border-slate-100 pt-6">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-950">
-              Retirada de VOX <span className="ml-1 text-sm font-normal text-slate-500 tabular-nums">{voxSet.size} provincias</span>
+              Retirada de VOX <span className="ml-1 text-sm font-normal text-slate-500 tabular-nums">{voxSet.size} de {withVox.length} listas</span>
             </h3>
-            <p className="text-sm text-slate-500">Donde VOX no se presenta, todos sus votos pasan al PP. Toca una provincia para cambiarlo.</p>
+            <p className="text-sm text-slate-500">Donde VOX no se presenta, todos sus votos pasan al PP. Toca una provincia para retirarlo.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Pill onClick={critical} title="Plazas donde el PP puede caer a 2-2 (margen menor del 2 %)">Críticas</Pill>
@@ -195,43 +185,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
           </div>
         </div>
-
-        <SearchBox value={voxSearch} onChange={setVoxSearch} placeholder="Buscar provincia" />
-
-        <div className="mt-3 max-h-60 space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
-          {grouped.map(({ ccaa, items }) => (
-            <div key={ccaa}>
-              <div className="mb-1 text-xs font-semibold text-slate-500">{ccaa}</div>
-              <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
-                {items.map(c => {
-                  const on = voxSet.has(c.name);
-                  if (!c.hasVox) {
-                    return (
-                      <span key={c.name} className="truncate rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs text-slate-400" title="No hay lista de VOX">
-                        {c.clean}
-                      </span>
-                    );
-                  }
-                  return (
-                    <button
-                      key={c.name}
-                      onClick={() => toggleVox(c.name)}
-                      aria-pressed={on}
-                      style={on ? { borderColor: PARTY_COLORS['VOX'], backgroundColor: getPartyTint('VOX', 0.14) } : undefined}
-                      className={`flex items-center justify-between gap-1 rounded-md border px-2 py-1 text-left text-xs cursor-pointer transition-colors ${
-                        on ? 'font-semibold text-slate-950' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-900'
-                      }`}
-                    >
-                      <span className="truncate">{c.clean}</span>
-                      {on && <Check className="h-3 w-3 shrink-0" strokeWidth={3} style={{ color: PARTY_COLORS['VOX'] }} />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {grouped.length === 0 && <p className="py-2 text-center text-xs text-slate-500">No hay provincias con ese nombre.</p>}
-        </div>
+        <SpainMap result={result} mode="vox" onToggleVox={toggleVox} />
+        <div className="mt-3"><MapLegend mode="vox" /></div>
       </section>
 
       {/* 4. Regional parties */}

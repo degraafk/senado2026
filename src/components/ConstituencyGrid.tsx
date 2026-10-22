@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { ConstituencyResult } from '../engine/senateEngine';
+import { ConstituencyResult, ModelResult } from '../engine/senateEngine';
 import { formatConstituencyName, getConstituencyCCAA, PARTY_COLORS } from '../data/electionData';
 import { ConstituencyDetailModal } from './ConstituencyDetailModal';
+import { SpainMap, MapLegend, MapMode } from './SpainMap';
 import { CARD, Delta, Pill, SearchBox, SeatDots, SectionHead } from './ui';
 
 interface Props {
+  result: ModelResult;
   constituencies: ConstituencyResult[];
   onToggleVoxWithdraw?: (name: string) => void;
 }
@@ -12,7 +14,9 @@ interface Props {
 type Filter = 'all' | 'flipped' | 'tight' | 'vox';
 const collator = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
 
-export const ConstituencyGrid: React.FC<Props> = ({ constituencies, onToggleVoxWithdraw }) => {
+export const ConstituencyGrid: React.FC<Props> = ({ result, constituencies, onToggleVoxWithdraw }) => {
+  const [view, setView] = useState<'map' | 'list'>('map');
+  const [mapMode, setMapMode] = useState<MapMode>('result');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [ccaa, setCcaa] = useState('all');
@@ -48,9 +52,28 @@ export const ConstituencyGrid: React.FC<Props> = ({ constituencies, onToggleVoxW
     <div className={`${CARD} space-y-5`}>
       <SectionHead
         title="Circunscripciones"
-        sub={`${list.length} de ${constituencies.length}. Toca una para ver los votos candidato a candidato.`}
+        sub={view === 'map' ? 'Cada cuadrado es una circunscripción. Toca una para ver los votos candidato a candidato.' : `${list.length} de ${constituencies.length}. Toca una para ver los votos.`}
+        right={
+          <div className="flex gap-1.5">
+            <Pill active={view === 'map'} onClick={() => setView('map')}>Mapa</Pill>
+            <Pill active={view === 'list'} onClick={() => setView('list')}>Lista</Pill>
+          </div>
+        }
       />
 
+      {view === 'map' && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill active={mapMode === 'result'} onClick={() => setMapMode('result')}>Resultado</Pill>
+            <Pill active={mapMode === 'changes'} onClick={() => setMapMode('changes')}>Cambios vs 2023 ({count(c => c.isFlipped)})</Pill>
+            <Pill active={mapMode === 'margin'} onClick={() => setMapMode('margin')} title="Lo cerca que está el último escaño">Márgenes ajustados ({count(c => c.isTight)})</Pill>
+          </div>
+          <SpainMap result={result} mode={mapMode} onSelect={setSelected} />
+          <MapLegend mode={mapMode} />
+        </>
+      )}
+
+      {view === 'list' && (<>
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={ccaa}
@@ -116,6 +139,8 @@ export const ConstituencyGrid: React.FC<Props> = ({ constituencies, onToggleVoxW
         ))}
         {groups.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No hay circunscripciones con esos filtros.</p>}
       </div>
+
+      </>)}
 
       <ConstituencyDetailModal constituency={selected} onClose={() => setSelected(null)} onToggleVoxWithdraw={onToggleVoxWithdraw} />
     </div>
