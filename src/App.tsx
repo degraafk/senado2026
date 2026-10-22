@@ -324,6 +324,7 @@ export default function App() {
             {/* Section: Constituency Grid (59 circunscripciones) */}
             <section id="provincias" className="gsap-fade">
               <ConstituencyGrid
+                result={result}
                 constituencies={result.cons}
                 onToggleVoxWithdraw={handleToggleVoxWithdraw}
               />
